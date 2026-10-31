@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>TranscreveTube</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d2e;--line:#26364d;--muted:#9aabc2;--accent:#55d6be}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(150deg,#101d31,#090e18 65%);font:16px system-ui,-apple-system,Segoe UI,sans-serif;color:#f4f7fb;min-height:100vh;display:grid;place-items:center;padding:22px}
+main{width:min(760px,100%)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:26px}.logo{width:46px;height:46px;border-radius:14px;background:var(--accent);color:#08221e;display:grid;place-items:center;font-size:24px;font-weight:900}.brand h1{font-size:22px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.card{background:rgba(18,29,46,.96);border:1px solid var(--line);border-radius:20px;padding:clamp(20px,5vw,34px);box-shadow:0 24px 70px #0005}
+h2{font-size:clamp(22px,4vw,30px);margin:0 0 8px} .intro{color:var(--muted);margin:0 0 24px;line-height:1.5}
+label{display:block;font-size:14px;font-weight:650;margin-bottom:9px} .row{display:flex;gap:10px}
+input{min-width:0;flex:1;background:#0b1422;border:1px solid #35465e;border-radius:12px;padding:15px;color:white;font-size:15px;outline:none}input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #55d6be22}
+button{border:0;border-radius:12px;padding:0 20px;font-weight:750;font-size:15px;cursor:pointer;background:var(--accent);color:#08221e}button:disabled{opacity:.55;cursor:wait}
+.status{min-height:25px;margin:14px 0 18px;color:var(--muted);font-size:14px}.status.error{color:#ff9d9d}.status.ok{color:#80e5c5}
+.output-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.output-head label{margin:0}.copy{padding:10px 15px;background:#24364b;color:#e9f2ff;border:1px solid #3a506b}
+textarea{width:100%;min-height:300px;resize:vertical;background:#0b1422;border:1px solid #35465e;border-radius:12px;padding:16px;color:#edf4ff;font:15px/1.65 system-ui;outline:none}
+.foot{color:#7f91a9;font-size:12px;text-align:center;margin:18px 0 0;line-height:1.5}
+@media(max-width:560px){.row{flex-direction:column}button#go{padding:15px}.output-head{align-items:flex-start;flex-direction:column}textarea{min-height:260px}}
+</style>
+</head>
+<body><main>
+<header class="brand"><div class="logo">T</div><div><h1>TranscreveTube</h1><p>Transcrição simples de vídeos do YouTube</p></div></header>
+<section class="card">
+<h2>Transforme vídeo em texto</h2>
+<p class="intro">Cole o link de um vídeo público do YouTube para visualizar a transcrição original e copiar o texto.</p>
+<label for="url">Link do YouTube</label>
+<div class="row"><input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="url"><button id="go">Transcrever</button></div>
+<div id="status" class="status" role="status" aria-live="polite">Pronto para receber um link.</div>
+<div class="output-head"><label for="result">Transcrição</label><button class="copy" id="copy" disabled>Copiar transcrição</button></div>
+<textarea id="result" placeholder="A transcrição aparecerá aqui..." spellcheck="false"></textarea>
+</section>
+<p class="foot">O texto é exibido no idioma da legenda disponível. Vídeos sem legendas acessíveis podem não ser transcritos.</p>
+</main>
+<script>
+const url=document.querySelector('#url'),go=document.querySelector('#go'),status=document.querySelector('#status'),result=document.querySelector('#result'),copy=document.querySelector('#copy');
+function setStatus(t,c=''){status.textContent=t;status.className='status '+c}
+function videoId(v){try{const u=new URL(v);if(u.hostname==='youtu.be')return u.pathname.slice(1);if(u.hostname.endsWith('youtube.com'))return u.searchParams.get('v')||u.pathname.split('/').filter(Boolean).pop();}catch{}return null}
+go.addEventListener('click',async()=>{const id=videoId(url.value.trim());if(!id||!/^[\w-]{11}$/.test(id)){setStatus('Cole um link válido de vídeo do YouTube.','error');return}
+go.disabled=true;copy.disabled=true;result.value='';setStatus('Consultando as legendas disponíveis...');try{
+const r=await fetch('/api/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoId:id,url:url.value.trim()})});
+const data=await r.json();if(!r.ok)throw new Error(data.error||'Não foi possível obter a transcrição.');
+result.value=data.text||'';if(!result.value)throw new Error('O serviço não retornou texto para este vídeo.');
+copy.disabled=false;setStatus(`Transcrição carregada${data.language?' · idioma: '+data.language:''}.`,'ok');
+}catch(e){setStatus(e.message||'Falha ao consultar as legendas. Tente novamente mais tarde.','error')}finally{go.disabled=false}});
+copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(result.value);setStatus('Transcrição copiada!','ok')}catch{result.select();document.execCommand('copy');setStatus('Texto selecionado para copiar.','ok')}});
+</script>
+</body></html>
